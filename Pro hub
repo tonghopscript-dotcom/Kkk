@@ -1,0 +1,379 @@
+--============================================================
+--  PRO MENU  (LocalScript)
+--  Đặt tại: StarterPlayer > StarterPlayerScripts
+--  Nút "PRO MENU" ở giữa mép trái → panel bật ra giữa màn hình
+--  Bấm "MAIN" để mở/đóng Speed, Jump, Gravity
+--============================================================
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+
+--──────────────── helpers ────────────────
+local function new(class, props, parent)
+	local inst = Instance.new(class)
+	for k, v in pairs(props) do inst[k] = v end
+	if parent then inst.Parent = parent end
+	return inst
+end
+
+--──────────────── giá trị ────────────────
+local speedValue   = 16
+local jumpValue    = 50
+local gravityValue = 196.2   -- mặc định của Roblox
+
+local function applyStats()
+	workspace.Gravity = gravityValue
+
+	local char = player.Character
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	if not hum then return end
+
+	hum.WalkSpeed = speedValue
+	if hum.UseJumpPower then
+		hum.JumpPower = jumpValue
+	else
+		hum.JumpHeight = jumpValue * 0.14
+	end
+end
+
+--──────────────── GUI ────────────────
+local gui = new("ScreenGui", {
+	Name = "ProMenu",
+	ResetOnSpawn = false,
+	IgnoreGuiInset = true,
+	ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+}, player:WaitForChild("PlayerGui"))
+
+-- Nút bật/tắt: giữa mép trái
+local toggleBtn = new("TextButton", {
+	Size = UDim2.new(0, 110, 0, 34),
+	Position = UDim2.new(0, 16, 0.5, 0),
+	AnchorPoint = Vector2.new(0, 0.5),
+	BackgroundColor3 = Color3.fromRGB(28, 30, 38),
+	Text = "PRO MENU",
+	Font = Enum.Font.GothamBold,
+	TextSize = 13,
+	TextColor3 = Color3.fromRGB(240, 240, 245),
+	AutoButtonColor = false,
+	BorderSizePixel = 0,
+}, gui)
+new("UICorner", { CornerRadius = UDim.new(0, 8) }, toggleBtn)
+new("UIStroke", { Color = Color3.fromRGB(70, 75, 90), Thickness = 1 }, toggleBtn)
+
+-- Panel chính: giữa màn hình, tự co giãn
+local panel = new("Frame", {
+	Size = UDim2.new(0, 260, 0, 0),
+	Position = UDim2.new(0.5, 0, 0.5, 0),
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	BackgroundColor3 = Color3.fromRGB(20, 21, 27),
+	BorderSizePixel = 0,
+	Visible = false,
+	AutomaticSize = Enum.AutomaticSize.Y,
+}, gui)
+new("UICorner", { CornerRadius = UDim.new(0, 12) }, panel)
+new("UIStroke", { Color = Color3.fromRGB(70, 75, 90), Thickness = 1 }, panel)
+new("UIListLayout", {
+	Padding = UDim.new(0, 0),
+	SortOrder = Enum.SortOrder.LayoutOrder,
+}, panel)
+
+-- Thanh tiêu đề (kéo thả)
+local titleBar = new("Frame", {
+	Size = UDim2.new(1, 0, 0, 40),
+	BackgroundColor3 = Color3.fromRGB(28, 30, 38),
+	BorderSizePixel = 0,
+	LayoutOrder = 1,
+}, panel)
+new("UICorner", { CornerRadius = UDim.new(0, 12) }, titleBar)
+
+new("TextLabel", {
+	Size = UDim2.new(1, -50, 1, 0),
+	Position = UDim2.new(0, 14, 0, 0),
+	BackgroundTransparency = 1,
+	Font = Enum.Font.GothamBold,
+	TextSize = 14,
+	TextColor3 = Color3.fromRGB(240, 240, 245),
+	TextXAlignment = Enum.TextXAlignment.Left,
+	Text = "PRO MENU",
+}, titleBar)
+
+local closeBtn = new("TextButton", {
+	Size = UDim2.new(0, 26, 0, 26),
+	Position = UDim2.new(1, -34, 0, 7),
+	BackgroundColor3 = Color3.fromRGB(45, 48, 58),
+	Text = "✕",
+	Font = Enum.Font.GothamBold,
+	TextSize = 12,
+	TextColor3 = Color3.fromRGB(220, 220, 228),
+	BorderSizePixel = 0,
+	AutoButtonColor = false,
+}, titleBar)
+new("UICorner", { CornerRadius = UDim.new(0, 6) }, closeBtn)
+
+-- Vùng chứa các mục
+local content = new("Frame", {
+	Size = UDim2.new(1, 0, 0, 0),
+	BackgroundTransparency = 1,
+	LayoutOrder = 2,
+	AutomaticSize = Enum.AutomaticSize.Y,
+}, panel)
+new("UIListLayout", {
+	Padding = UDim.new(0, 0),
+	SortOrder = Enum.SortOrder.LayoutOrder,
+}, content)
+new("UIPadding", {
+	PaddingTop = UDim.new(0, 8),
+	PaddingBottom = UDim.new(0, 8),
+	PaddingLeft = UDim.new(0, 10),
+	PaddingRight = UDim.new(0, 10),
+}, content)
+
+--──────────────── mục accordion ────────────────
+local function createSection(parent, titleText, layoutOrder)
+	local section = new("Frame", {
+		Size = UDim2.new(1, 0, 0, 0),
+		BackgroundTransparency = 1,
+		LayoutOrder = layoutOrder,
+		AutomaticSize = Enum.AutomaticSize.Y,
+	}, parent)
+	new("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder }, section)
+	new("UIPadding", { PaddingTop = UDim.new(0, 4), PaddingBottom = UDim.new(0, 4) }, section)
+
+	local header = new("TextButton", {
+		Size = UDim2.new(1, 0, 0, 34),
+		BackgroundColor3 = Color3.fromRGB(32, 34, 44),
+		Text = "",
+		AutoButtonColor = false,
+		BorderSizePixel = 0,
+		LayoutOrder = 1,
+	}, section)
+	new("UICorner", { CornerRadius = UDim.new(0, 8) }, header)
+
+	new("TextLabel", {
+		Size = UDim2.new(1, -40, 1, 0),
+		Position = UDim2.new(0, 12, 0, 0),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.GothamBold,
+		TextSize = 13,
+		TextColor3 = Color3.fromRGB(120, 180, 255),
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Text = titleText,
+	}, header)
+
+	local arrow = new("TextLabel", {
+		Size = UDim2.new(0, 20, 1, 0),
+		Position = UDim2.new(1, -28, 0, 0),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.GothamBold,
+		TextSize = 13,
+		TextColor3 = Color3.fromRGB(160, 165, 180),
+		Text = "▸",
+	}, header)
+
+	local body = new("Frame", {
+		Size = UDim2.new(1, 0, 0, 0),
+		BackgroundTransparency = 1,
+		LayoutOrder = 2,
+		Visible = false,
+		AutomaticSize = Enum.AutomaticSize.Y,
+	}, section)
+	new("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }, body)
+	new("UIPadding", { PaddingTop = UDim.new(0, 8), PaddingBottom = UDim.new(0, 4) }, body)
+
+	header.MouseButton1Click:Connect(function()
+		body.Visible = not body.Visible
+		arrow.Text = body.Visible and "▾" or "▸"
+	end)
+
+	return body
+end
+
+--──────────────── slider ────────────────
+local function createSlider(parent, labelText, minValue, maxValue, defaultValue, onChanged, layoutOrder)
+	local row = new("Frame", {
+		Size = UDim2.new(1, 0, 0, 46),
+		BackgroundTransparency = 1,
+		LayoutOrder = layoutOrder,
+	}, parent)
+
+	new("TextLabel", {
+		Size = UDim2.new(1, -60, 0, 18),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.GothamMedium,
+		TextSize = 13,
+		TextColor3 = Color3.fromRGB(225, 225, 232),
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Text = labelText,
+	}, row)
+
+	local valueLabel = new("TextLabel", {
+		Size = UDim2.new(0, 60, 0, 18),
+		Position = UDim2.new(1, -60, 0, 0),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.GothamBold,
+		TextSize = 13,
+		TextColor3 = Color3.fromRGB(120, 180, 255),
+		TextXAlignment = Enum.TextXAlignment.Right,
+		Text = "0",
+	}, row)
+
+	local track = new("Frame", {
+		Size = UDim2.new(1, 0, 0, 6),
+		Position = UDim2.new(0, 0, 0, 28),
+		BackgroundColor3 = Color3.fromRGB(50, 52, 62),
+		BorderSizePixel = 0,
+	}, row)
+	new("UICorner", { CornerRadius = UDim.new(1, 0) }, track)
+
+	local fill = new("Frame", {
+		Size = UDim2.new(0, 0, 1, 0),
+		BackgroundColor3 = Color3.fromRGB(90, 150, 255),
+		BorderSizePixel = 0,
+	}, track)
+	new("UICorner", { CornerRadius = UDim.new(1, 0) }, fill)
+
+	local handle = new("Frame", {
+		Size = UDim2.new(0, 14, 0, 14),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0, 0, 0.5, 0),
+		BackgroundColor3 = Color3.fromRGB(245, 245, 250),
+		BorderSizePixel = 0,
+	}, track)
+	new("UICorner", { CornerRadius = UDim.new(1, 0) }, handle)
+
+	local dragging = false
+
+	local function setValue(v)
+		local clamped = math.clamp(v, minValue, maxValue)
+		local percent = (clamped - minValue) / (maxValue - minValue)
+		fill.Size = UDim2.new(percent, 0, 1, 0)
+		handle.Position = UDim2.new(percent, 0, 0.5, 0)
+		valueLabel.Text = tostring(math.floor(clamped + 0.5))
+		if onChanged then onChanged(clamped) end
+	end
+
+	local function updateFromInput(input)
+		local relativeX = input.Position.X - track.AbsolutePosition.X
+		local percent = math.clamp(relativeX / math.max(track.AbsoluteSize.X, 1), 0, 1)
+		setValue(minValue + percent * (maxValue - minValue))
+	end
+
+	track.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			updateFromInput(input)
+		end
+	end)
+
+	handle.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+		end
+	end)
+
+	UserInputService.InputChanged:Connect(function(input)
+		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement
+			or input.UserInputType == Enum.UserInputType.Touch) then
+			updateFromInput(input)
+		end
+	end)
+
+	UserInputService.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = false
+		end
+	end)
+
+	setValue(defaultValue)
+	return setValue
+end
+
+--──────────────── MỤC "MAIN" ────────────────
+local mainBody = createSection(content, "MAIN", 1)
+
+local setSpeed = createSlider(mainBody, "Speed", 1, 200, speedValue, function(v)
+	speedValue = v
+	applyStats()
+end, 1)
+
+local setJump = createSlider(mainBody, "Jump", 0, 300, jumpValue, function(v)
+	jumpValue = v
+	applyStats()
+end, 2)
+
+local setGravity = createSlider(mainBody, "Gravity", 0, 500, gravityValue, function(v)
+	gravityValue = v
+	applyStats()
+end, 3)
+
+local resetBtn = new("TextButton", {
+	Size = UDim2.new(1, 0, 0, 30),
+	BackgroundColor3 = Color3.fromRGB(35, 38, 48),
+	Text = "Đặt lại mặc định",
+	Font = Enum.Font.GothamMedium,
+	TextSize = 12,
+	TextColor3 = Color3.fromRGB(220, 220, 228),
+	BorderSizePixel = 0,
+	AutoButtonColor = false,
+	LayoutOrder = 4,
+}, mainBody)
+new("UICorner", { CornerRadius = UDim.new(0, 8) }, resetBtn)
+
+resetBtn.MouseButton1Click:Connect(function()
+	setSpeed(16)
+	setJump(50)
+	setGravity(196.2)
+end)
+
+--──────────────── bật/tắt ────────────────
+toggleBtn.MouseButton1Click:Connect(function()
+	panel.Visible = not panel.Visible
+end)
+
+closeBtn.MouseButton1Click:Connect(function()
+	panel.Visible = false
+end)
+
+--──────────────── kéo thả panel ────────────────
+local isDragging = false
+local dragStart, startPos
+
+titleBar.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1
+		or input.UserInputType == Enum.UserInputType.Touch then
+		isDragging = true
+		dragStart = input.Position
+		startPos = panel.Position
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if isDragging and (input.UserInputType == Enum.UserInputType.MouseMovement
+		or input.UserInputType == Enum.UserInputType.Touch) then
+		local delta = input.Position - dragStart
+		panel.Position = UDim2.new(
+			startPos.X.Scale, startPos.X.Offset + delta.X,
+			startPos.Y.Scale, startPos.Y.Offset + delta.Y
+		)
+	end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1
+		or input.UserInputType == Enum.UserInputType.Touch then
+		isDragging = false
+	end
+end)
+
+--──────────────── áp dụng khi hồi sinh ────────────────
+player.CharacterAdded:Connect(function(char)
+	char:WaitForChild("Humanoid", 5)
+	applyStats()
+end)
+
+applyStats()
